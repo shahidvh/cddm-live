@@ -5,21 +5,64 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$DIR"
 
 echo "=========================================================="
-echo "          Installing CDDM Live Environment                "
+echo "          Installing CDDM Live & Desktop Launcher         "
 echo "=========================================================="
 
-if [ ! -d "venv" ]; then
-    python3 -m venv venv
+# 1. Check for Python 3 and python3-venv
+if ! command -v python3 &>/dev/null || ! python3 -m venv --help &>/dev/null; then
+    echo "(!) Python 3 or python3-venv is missing."
+    echo "Installing required system packages (sudo password may be required)..."
+    sudo apt update && sudo apt install -y python3 python3-venv python3-pip
 fi
 
+# 2. Rebuild local virtual environment if missing or broken
+if [ ! -d "$DIR/venv" ] || [ ! -x "$DIR/venv/bin/python3" ]; then
+    echo "Creating virtual environment..."
+    rm -rf "$DIR/venv"
+    python3 -m venv "$DIR/venv"
+fi
+
+# 3. Upgrade pip and install requirements
+echo "Installing Python dependencies (PySide6, requests, certifi)..."
 "$DIR/venv/bin/pip" install --upgrade pip
 
 if [ -f "$DIR/requirements.txt" ]; then
     "$DIR/venv/bin/pip" install -r "$DIR/requirements.txt"
 else
-    "$DIR/venv/bin/pip" install requests PySide6 certifi
+    "$DIR/venv/bin/pip" install "PySide6>=6.5.0" "requests>=2.28.0" "certifi>=2023.5.7"
+fi
+
+# Ensure executable permissions on launchers
+chmod +x "$DIR/run_cddm.sh" "$DIR/install.sh" 2>/dev/null || true
+
+# 4. Register application in Ubuntu App Launcher (~/.local/share/applications)
+echo "Registering CDDM Live in Ubuntu Application Menu..."
+mkdir -p "$HOME/.local/share/applications"
+
+cat << DESKTOP_EOF > "$HOME/.local/share/applications/cddm.desktop"
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=CDDM Live
+GenericName=GNSS Archive Monitor
+Comment=NASA CDDIS GNSS Telemetry & Archive Monitor
+Exec=$DIR/run_cddm.sh
+Icon=$DIR/program/cddis_icon.png
+Path=$DIR
+Terminal=false
+Categories=Science;Geoscience;Education;
+StartupNotify=true
+DESKTOP_EOF
+
+chmod +x "$HOME/.local/share/applications/cddm.desktop"
+
+# Refresh desktop launcher cache so the icon shows up immediately
+if command -v update-desktop-database &>/dev/null; then
+    update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
 fi
 
 echo "=========================================================="
-echo "✓ Installation complete! Run './run_cddm.sh' to start CDDM"
+echo "✓ Installation complete!"
+echo "• Launch via terminal: ./run_cddm.sh"
+echo "• Or search 'CDDM Live' in Ubuntu's Applications menu!"
 echo "=========================================================="
