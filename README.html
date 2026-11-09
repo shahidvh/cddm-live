@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CDDM Live — GNSS Archive Monitor</title>
+  <style>
+    :root {
+      --bg: #000000;
+      --card-bg: rgba(28, 28, 30, 0.78);
+      --card-hover: rgba(44, 44, 46, 0.90);
+      --border: rgba(255, 255, 255, 0.12);
+      --text: #86868b;
+      --text-heading: #f5f5f7;
+      --accent: #2997ff;
+      --accent-soft: rgba(41, 151, 255, 0.14);
+      --code-bg: #1c1c1e;
+      --green: #30d158;
+      --amber: #ffd60a;
+      --red: #ff453a;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Animated Satellite Constellation Background */
+    #constellation-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.78);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--text-heading);
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .brand img {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      object-fit: contain;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 3px;
+      border-radius: 20px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 16px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+
+    .tab-btn:hover { color: var(--text-heading); }
+    .tab-btn.active {
+      background: rgba(255, 255, 255, 0.18);
+      color: #ffffff;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 48px 24px 80px 24px;
+    }
+
+    .page-section {
+      display: none;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.35s ease;
+    }
+
+    .page-section.active {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .hero { text-align: center; padding: 36px 0 48px 0; }
+    .hero-badge {
+      display: inline-block;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid rgba(41, 151, 255, 0.3);
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .hero-logo {
+      width: 76px;
+      height: 76px;
+      margin: 0 auto 20px auto;
+      display: block;
+      filter: drop-shadow(0 10px 24px rgba(41, 151, 255, 0.25));
+    }
+
+    h1 {
+      font-size: 42px;
+      font-weight: 700;
+      color: var(--text-heading);
+      letter-spacing: -1.2px;
+      margin-bottom: 12px;
+    }
+
+    .lead {
+      font-size: 18px;
+      color: #a1a1a6;
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    h2 {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--text-heading);
+      letter-spacing: -0.5px;
+      margin-top: 40px;
+      margin-bottom: 20px;
+    }
+
+    h3 {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--text-heading);
+      margin-top: 24px;
+      margin-bottom: 8px;
+    }
+
+    p { margin-bottom: 16px; font-size: 15px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      transition: all 0.25s ease;
+    }
+
+    .card:hover {
+      background: var(--card-hover);
+      border-color: rgba(255, 255, 255, 0.24);
+      transform: translateY(-2px);
+    }
+
+    .card h4 {
+      font-size: 16px;
+      color: var(--text-heading);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card p { font-size: 14px; margin: 0; line-height: 1.55; }
+
+    ol, ul { padding-left: 20px; margin-bottom: 24px; }
+    li { margin-bottom: 10px; font-size: 15px; }
+    li strong { color: var(--text-heading); }
+
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      overflow-x: auto;
+      margin: 10px 0 20px 0;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 13.5px;
+      color: #70b7ff;
+    }
+
+    .status-group { display: flex; flex-direction: column; gap: 10px; margin: 16px 0 28px 0; }
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 18px;
+      font-size: 14px;
+      backdrop-filter: blur(14px);
+    }
+
+    .pill {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 6px;
+      min-width: 82px;
+      text-align: center;
+    }
+
+    .pill-ok { background: rgba(48, 209, 88, 0.15); color: var(--green); border: 1px solid rgba(48, 209, 88, 0.35); }
+    .pill-miss { background: rgba(255, 69, 58, 0.15); color: var(--red); border: 1px solid rgba(255, 69, 58, 0.35); }
+    .pill-warn { background: rgba(255, 214, 10, 0.15); color: var(--amber); border: 1px solid rgba(255, 214, 10, 0.35); }
+    .pill-grey { background: rgba(142, 142, 147, 0.15); color: #aeaeb2; border: 1px solid rgba(142, 142, 147, 0.35); }
+
+    /* Specification Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+      margin: 16px 0 24px 0;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      backdrop-filter: blur(14px);
+    }
+    th, td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      color: var(--text-heading);
+      background: rgba(255, 255, 255, 0.06);
+      font-weight: 600;
+    }
+    td { color: #cbd5e1; }
+    tr:last-child td { border-bottom: none; }
+
+    .contact-card { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+    .contact-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 20px;
+      backdrop-filter: blur(14px);
+    }
+
+    .contact-label { font-size: 14px; color: var(--text); }
+    .contact-val { font-size: 14px; font-weight: 500; color: var(--accent); }
+
+    .license-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: #a1a1a6;
+      margin-top: 14px;
+      backdrop-filter: blur(14px);
+    }
+
+    footer {
+      position: relative;
+      z-index: 1;
+      border-top: 1px solid var(--border);
+      padding: 32px 24px;
+      text-align: center;
+      font-size: 13px;
+      color: #6e6e73;
+    }
+
+    @media (max-width: 600px) {
+      h1 { font-size: 30px; }
+      nav { flex-direction: column; gap: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Animated Satellite Constellation Background -->
+  <canvas id="constellation-canvas"></canvas>
+
+  <nav>
+    <a href="#" class="brand" onclick="switchTab('overview')">
+      <img src="program/cddis_icon.png" alt="CDDM Logo" onerror="this.style.display='none'">
+      <span>CDDM Live</span>
+    </a>
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+      <button class="tab-btn" onclick="switchTab('guide')">Guide & Specs</button>
+      <button class="tab-btn" onclick="switchTab('about')">Author & License</button>
+    </div>
+  </nav>
+
+  <div class="container">
+
+    <!-- TAB 1: OVERVIEW -->
+    <section id="tab-overview" class="page-section active">
+      <div class="hero">
+        <img class="hero-logo" src="program/cddis_icon.png" alt="CDDM Live Logo" onerror="this.style.display='none'">
+        <div class="hero-badge">Version 1.1 • GNSS Geodesy Tool</div>
+        <h1>Effortless Archive Monitoring.</h1>
+        <p class="lead">Autonomous desktop verification engine engineered to track real-time telemetry, audit historical gaps, and verify observation completeness across NASA CDDIS GNSS archives.</p>
+      </div>
+
+      <h2>Engineered for Reliability</h2>
+      <div class="grid">
+        <div class="card">
+          <h4>⚡ Real-Time Live Telemetry</h4>
+          <p>Streams current-day arrivals from Hour 00 to active UTC, instantly logging file availability and arrival timestamps.</p>
+        </div>
+        <div class="card">
+          <h4>📊 Offline Gap Audit Matrix</h4>
+          <p>Parses station logs completely offline without querying NASA CDDIS, eliminating latency and avoiding account rate limits.</p>
+        </div>
+        <div class="card">
+          <h4>↻ Intelligent Gap Re-Check</h4>
+          <p>Skips all verified 24/24 complete days, focusing background network requests strictly on missing or incomplete dates.</p>
+        </div>
+        <div class="card">
+          <h4>🛡️ Strict 24/24 Verification</h4>
+          <p>Requires every hour of a past Julian Day to be confirmed before showing a green badge, eliminating false positives.</p>
+        </div>
+        <div class="card">
+          <h4>📦 Automated Daily 24h Fallback</h4>
+          <p>Verifies daily composite archives (<code>*.crx.gz</code>) if real-time hourly telemetry experienced a network dropout.</p>
+        </div>
+        <div class="card">
+          <h4>📈 In-Place Progress Feedback</h4>
+          <p>Tracks active multi-slot scans with a dynamic in-place percentage indicator and smooth indeterminate visual cues.</p>
+        </div>
+      </div>
+
+      <h2>Status Badges at a Glance</h2>
+      <div class="status-group">
+        <div class="status-item">
+          <span class="pill pill-ok">✔ DOY</span>
+          <span><b>Complete (24/24 Slots):</b> All 24 hourly observation segments are verified and logged in local storage.</span>
+        </div>
+        <div class="status-item">
+          <span class="pill pill-miss">✖ DOY</span>
+          <span><b>Incomplete / Missing:</b> File dropouts detected or fewer than 24 hours logged on a past Julian Day.</span>
+        </div>
+        <div class="status-item">
+          <span class="pill pill-grey">○ DOY</span>
+          <span><b>Unaudited Day:</b> Historical past day that has not yet been scanned locally or queried on CDDIS.</span>
+        </div>
+        <div class="status-item">
+          <span class="pill pill-warn">PENDING</span>
+          <span><b>Slot In Flight:</b> Active hour currently queued for network verification or awaiting ingest grace period.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: GUIDE & SPECS -->
+    <section id="tab-guide" class="page-section">
+
+      <h2>System Requirements & Platform Support</h2>
+      <p>CDDM is engineered for Linux research workstations, supporting standard LTS releases and rolling distributions:</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Component</th>
+            <th>Specification / Tested Versions</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Operating System</b></td>
+            <td>Ubuntu 20.04, 22.04, 24.04, 26.04 LTS • Debian 11/12 • Fedora • Arch</td>
+            <td><span class="pill pill-ok" style="min-width:60px;">Supported</span></td>
+          </tr>
+          <tr>
+            <td><b>Python Runtime</b></td>
+            <td>Python 3.8, 3.10, 3.12, 3.13, 3.14+ (CPython x86_64)</td>
+            <td><span class="pill pill-ok" style="min-width:60px;">Supported</span></td>
+          </tr>
+          <tr>
+            <td><b>Desktop Environment</b></td>
+            <td>GNOME, KDE Plasma, XFCE (Wayland & X11 display servers)</td>
+            <td><span class="pill pill-ok" style="min-width:60px;">Verified</span></td>
+          </tr>
+          <tr>
+            <td><b>RAM Footprint</b></td>
+            <td>Minimum 1 GB RAM (app uses ~60 MB active memory during scans)</td>
+            <td><span class="pill pill-ok" style="min-width:60px;">Lightweight</span></td>
+          </tr>
+          <tr>
+            <td><b>Core Libraries</b></td>
+            <td>PySide6 (Qt 6 GUI framework), Requests, Mozilla Certifi CA chain</td>
+            <td><span class="pill pill-ok" style="min-width:60px;">Bundled</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Storage & Package Footprint</h2>
+      <div class="grid">
+        <div class="card">
+          <h4>📦 Source Archive (ZIP)</h4>
+          <p><b>Size: ~1.5 MB</b><br>Lightweight distribution containing Python source modules, desktop launcher, and graphic assets.</p>
+        </div>
+        <div class="card">
+          <h4>💾 Installed Footprint (venv)</h4>
+          <p><b>Size: ~230 MB – 250 MB</b><br>Includes local Qt6 C++ runtime wheels (<code>libQt6Widgets</code>, <code>libQt6Core</code>) isolated from system packages.</p>
+        </div>
+        <div class="card">
+          <h4>🛡️ Dist-Upgrade Resilience</h4>
+          <p><b>Self-Healing Launcher:</b> Automatically rebuilds virtual environment symlinks if the host Ubuntu OS upgrades its system Python.</p>
+        </div>
+      </div>
+
+      <h2>Automated Setup & Launch</h2>
+      <ol>
+        <li>
+          <strong>Extract Archive & Open Terminal in Directory:</strong>
+          <pre><code>unzip CDDM_v1.1.zip
+cd CDDM</code></pre>
+        </li>
+        <li>
+          <strong>Run Setup Script:</strong>
+          <pre><code>./install.sh</code></pre>
+          <p style="font-size: 13px; color: #86868b; margin-top: -12px;">Builds the local virtual environment, installs PySide6, and establishes the Mozilla root CA trust store (<code>certifi</code>) for secure NASA Earthdata HTTPS handshakes.</p>
+        </li>
+        <li>
+          <strong>Launch Application:</strong>
+          <pre><code>./run_cddm.sh</code></pre>
+        </li>
+      </ol>
+
+      <h2>Basic Operations</h2>
+      <h3>1. Authentication & Cookie Persistence</h3>
+      <p>Enter your NASA Earthdata credentials on first start. Choose <strong>Save credentials</strong> to store tokens safely and auto-launch in future runs. OAuth tokens are persistently cached in <code>~/.cddis_cookies.txt</code> to avoid repeated authorization redirects. To switch users, click <strong>👤 User ▾ &rarr; Logout</strong>.</p>
+
+      <h3>2. Switching Monitoring Modes</h3>
+      <ul>
+        <li><strong>Live Mode:</strong> Tracks the current Julian Day in real time as hours roll over, streaming slot status dynamically.</li>
+        <li><strong>DOY Audit Mode:</strong> Allows selecting any historical DOY and year to audit station archives.</li>
+        <li><strong>Offline Gap Audit (<code>📊 Gap Audit</code>):</strong> Opens the matrix dialog to review cached summaries without generating network traffic.</li>
+      </ul>
+
+      <h3>3. Display-Only CSV Export</h3>
+      <p>Click <strong>Export CSV</strong> at any time to generate clean tabular reports. In the Gap Audit dialog, unchecking completed days exports strictly the filtered list of missing days.</p>
+
+      <h2>Network & Proxy Configuration</h2>
+      <p>CDDM supports direct internet connections as well as university or institutional proxies.</p>
+      <ul>
+        <li><b>Direct Internet / Home Hotspot:</b> Operates directly over standard HTTPS port 443.</li>
+        <li><b>Institutional Proxy:</b> Run the interactive proxy configurator:
+          <pre><code>./set_proxy.sh</code></pre>
+          Choose option <code>1</code> for Direct Internet or option <code>2</code> to enter your institute's proxy IP.
+        </li>
+      </ul>
+
+      <h2>Network Troubleshooting & Auto-Repair</h2>
+      <p>If you encounter login errors, SSL handshake failures, or proxy connection issues on a new machine, run the built-in diagnostic repair tool:</p>
+      <pre><code>bash diagnose_network.sh</code></pre>
+      <p style="font-size: 13px; color: #86868b; margin-top: -12px;">This tool automatically scans DNS resolution, corrects dead proxy settings, fixes <code>~/.netrc</code> permission conflicts, and re-links the Mozilla SSL root certificate chain.</p>
+
+      <h2>Uninstallation</h2>
+      <p>To cleanly remove the virtual environment, cached logs, autostart entries, and local credentials at any time, run:</p>
+      <pre><code>bash uninstall.sh</code></pre>
+    </section>
+
+    <!-- TAB 3: ABOUT -->
+    <section id="tab-about" class="page-section">
+      <h2>Author & Project Information</h2>
+      <div class="contact-card">
+        <div class="contact-item">
+          <span class="contact-label">Lead Developer & Researcher</span>
+          <span class="contact-val">Muhammed Shahid VH</span>
+        </div>
+        <div class="contact-item">
+          <span class="contact-label">Development Support</span>
+          <span class="contact-val">Dilfa CP — Researcher in Geoinformatics</span>
+        </div>
+        <div class="contact-item">
+          <span class="contact-label">Specialization</span>
+          <span class="contact-val">Geologist & Geoinformatics Researcher</span>
+        </div>
+        <div class="contact-item">
+          <span class="contact-label">Location</span>
+          <span class="contact-val">India</span>
+        </div>
+        <div class="contact-item">
+          <span class="contact-label">Software Ecosystem</span>
+          <span class="contact-val">PySide6 • ObsPy • GNSS Pipe Toolchain</span>
+        </div>
+      </div>
+
+      <h2>License Details</h2>
+      <div class="license-box">
+        <strong>MIT License</strong><br><br>
+        Copyright &copy; 2026 Muhammed Shahid VH. All rights reserved.<br><br>
+        Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:<br><br>
+        The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.<br><br>
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+      </div>
+    </section>
+
+  </div>
+
+  <footer>
+    <p>Copyright &copy; 2026 CDDM Live. All rights reserved.</p>
+  </footer>
+
+  <!-- Tab Switcher Script -->
+  <script>
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      const activeBtn = Array.from(document.querySelectorAll('.tab-btn')).find(b => 
+        b.getAttribute('onclick').includes(tabId)
+      );
+      if (activeBtn) activeBtn.classList.add('active');
+
+      document.querySelectorAll('.page-section').forEach(sec => sec.classList.remove('active'));
+      const activeSec = document.getElementById('tab-' + tabId);
+      if (activeSec) activeSec.classList.add('active');
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  </script>
+
+  <!-- Satellite Constellation Animation Canvas Script -->
+  <script>
+    const canvas = document.getElementById('constellation-canvas');
+    const ctx = canvas.getContext('2d');
+
+    let width = canvas.width = window.innerWidth;
+    let height = canvas.height = window.innerHeight;
+
+    window.addEventListener('resize', () => {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+      initNodes();
+    });
+
+    const NUM_SATELLITES = 38;
+    const CONNECT_DISTANCE = 145;
+    let satellites = [];
+
+    class Satellite {
+      constructor() {
+        this.x = Math.random() * width;
+        this.y = Math.random() * height;
+        this.vx = (Math.random() - 0.5) * 0.45;
+        this.vy = (Math.random() - 0.5) * 0.45;
+        this.radius = Math.random() * 1.8 + 1.2;
+        this.isGNSS = Math.random() > 0.65;
+        this.blinkPhase = Math.random() * Math.PI * 2;
+      }
+
+      update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.blinkPhase += 0.03;
+
+        if (this.x < 0) this.x = width;
+        if (this.x > width) this.x = 0;
+        if (this.y < 0) this.y = height;
+        if (this.y > height) this.y = 0;
+      }
+
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        
+        if (this.isGNSS) {
+          const glow = (Math.sin(this.blinkPhase) + 1) * 0.5;
+          ctx.fillStyle = `rgba(41, 151, 255, ${0.6 + glow * 0.4})`;
+          ctx.shadowBlur = 8 + glow * 4;
+          ctx.shadowColor = '#2997ff';
+        } else {
+          ctx.fillStyle = 'rgba(134, 134, 139, 0.65)';
+          ctx.shadowBlur = 0;
+        }
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+    }
+
+    function initNodes() {
+      satellites = [];
+      for (let i = 0; i < NUM_SATELLITES; i++) {
+        satellites.push(new Satellite());
+      }
+    }
+
+    function animate() {
+      ctx.clearRect(0, 0, width, height);
+
+      for (let i = 0; i < satellites.length; i++) {
+        for (let j = i + 1; j < satellites.length; j++) {
+          const dx = satellites[i].x - satellites[j].x;
+          const dy = satellites[i].y - satellites[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < CONNECT_DISTANCE) {
+            const alpha = (1 - dist / CONNECT_DISTANCE) * 0.22;
+            ctx.strokeStyle = `rgba(41, 151, 255, ${alpha})`;
+            ctx.lineWidth = 0.75;
+            ctx.beginPath();
+            ctx.moveTo(satellites[i].x, satellites[i].y);
+            ctx.lineTo(satellites[j].x, satellites[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      satellites.forEach(sat => {
+        sat.update();
+        sat.draw();
+      });
+
+      requestAnimationFrame(animate);
+    }
+
+    initNodes();
+    animate();
+  </script>
+
+</body>
+</html>

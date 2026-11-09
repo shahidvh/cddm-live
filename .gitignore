@@ -1,0 +1,29 @@
+# Python bytecode & environments
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+dist/
+build/
+*.egg-info/
+
+# Sensitive authentication & network data
+.cddis_cookies.txt
+*.netrc
+proxy.conf
+
+# Local GNSS download data & station logs
+*.txt
+*.csv
+*.crx
+*.crx.gz
+*.rnx
+*.rnx.gz
+
+# System & desktop artifacts
+.DS_Store
+Thumbs.db
+*.desktop
+*.log
