@@ -16,6 +16,7 @@ proxy.conf
 
 # Local GNSS download data & station logs
 *.txt
+!requirements.txt
 *.csv
 *.crx
 *.crx.gz
